@@ -40,6 +40,7 @@ jobs:
         echo "CUSTOM_GCC_32_BRANCH=$(cat $CONFIG_ENV | grep -w "CUSTOM_GCC_32_BRANCH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "CUSTOM_GCC_32_BIN=$(cat $CONFIG_ENV | grep -w "CUSTOM_GCC_32_BIN" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "ENABLE_KERNELSU=$(cat $CONFIG_ENV | grep -w "ENABLE_KERNELSU" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "KERNELSU_REPO=$(cat $CONFIG_ENV | grep -w "KERNELSU_REPO" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "KERNELSU_TAG=$(cat $CONFIG_ENV | grep -w "KERNELSU_TAG" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "ADD_KPROBES_CONFIG=$(cat $CONFIG_ENV | grep -w "ADD_KPROBES_CONFIG" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "DISABLE-LTO=$(cat $CONFIG_ENV | grep -w "DISABLE-LTO" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
@@ -82,8 +83,7 @@ jobs:
         sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev libncurses5-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
-    - name: Download Clang-aosp
-      if: env.USE_CUSTOM_CLANG != 'true'
+    - name: Download toolchain
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         mkdir clang-aosp
@@ -219,16 +219,16 @@ jobs:
             echo "CONFIG_KPROBE_EVENTS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
         fi
         if [ ${{ env.ADD_OVERLAYFS_CONFIG }} = true ]; then
-            echo "CONFIG_OVERLAY_FS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/${{ env.KERNEL_CONFIG }}
         fi
         if [ ${{ env.DISABLE-LTO }} = true ]; then
-            sed -i 's/CONFIG_LTO=y/CONFIG_LTO=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-            sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_CLANG=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-            sed -i 's/CONFIG_THINLTO=y/CONFIG_THINLTO=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-            echo "CONFIG_LTO_NONE=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            sed -i 's/CONFIG_LTO=y/CONFIG_LTO=n/' arch/arm64/configs/${{ env.KERNEL_CONFIG }}
+            sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_CLANG=n/' arch/arm64/configs/${{ env.KERNEL_CONFIG }}
+            sed -i 's/CONFIG_THINLTO=y/CONFIG_THINLTO=n/' arch/arm64/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_LTO_NONE=y" >> arch/arm64/configs/${{ env.KERNEL_CONFIG }}
         fi
         if [ ${{ env.DISABLE_CC_WERROR }} = true ]; then
-            echo "CONFIG_CC_WERROR=n" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_CC_WERROR=n" >> arch/arm64/configs/${{ env.KERNEL_CONFIG }}
         fi
 
     - name: Setup ccache
@@ -258,14 +258,14 @@ jobs:
     - name: Check a kernel output files
       run: |
        cd $GITHUB_WORKSPACE/kernel_workspace
-       if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} ]; then
+       if [ -f android-kernel/out/arch/arm64/boot/${{ env.KERNEL_IMAGE_NAME }} ]; then
            echo "CHECK_FILE_IS_OK=true" >> $GITHUB_ENV
        else
            echo "Kernel output file is empty"
            exit 1
        fi
        if [ ${{ env.NEED_DTBO }} = true ]; then
-           if [ -f android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img ]; then
+           if [ -f android-kernel/out/arch/arm64/boot/dtbo.img ]; then
                echo "CHECK_DTBO_IS_OK=true" >> $GITHUB_ENV
            else
                echo "DTBO image is empty"
@@ -281,9 +281,9 @@ jobs:
         sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
         sed -i 's!block=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!block=auto;!g' AnyKernel3/anykernel.sh
         sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
-        cp android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} AnyKernel3/
+        cp android-kernel/out/arch/arm64/boot/${{ env.KERNEL_IMAGE_NAME }} AnyKernel3/
         if [ ${{ env.CHECK_DTBO_IS_OK }} = true ]; then
-            cp android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img AnyKernel3/
+            cp android-kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
         fi
         rm -rf AnyKernel3/.git* AnyKernel3/README.md
 
@@ -315,7 +315,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         tools/unpack_bootimg.py --boot_img boot-source.img
-        cp android-kernel/out/arch/${{ env.ARCH }}/boot/${{ env.KERNEL_IMAGE_NAME }} out/kernel
+        cp android-kernel/out/arch/arm64/boot/${{ env.KERNEL_IMAGE_NAME }} out/kernel
         tools/mkbootimg.py ${{ env.FORMAT_MKBOOTING }} -o boot.img
         if [ -f boot.img ]; then
             echo "MAKE_BOOT_IMAGE_IS_OK=true" >> $GITHUB_ENV
@@ -343,7 +343,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: dtbo-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
-        path: kernel_workspace/android-kernel/out/arch/${{ env.ARCH }}/boot/dtbo.img
+        path: kernel_workspace/android-kernel/out/arch/arm64/boot/dtbo.img
 
     - name: Upload boot image
       if: env.MAKE_BOOT_IMAGE_IS_OK == 'true'
