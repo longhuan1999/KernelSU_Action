@@ -40,7 +40,6 @@ jobs:
         echo "CUSTOM_GCC_32_BRANCH=$(cat $CONFIG_ENV | grep -w "CUSTOM_GCC_32_BRANCH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "CUSTOM_GCC_32_BIN=$(cat $CONFIG_ENV | grep -w "CUSTOM_GCC_32_BIN" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "ENABLE_KERNELSU=$(cat $CONFIG_ENV | grep -w "ENABLE_KERNELSU" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-        echo "KERNELSU_REPO=$(cat $CONFIG_ENV | grep -w "KERNELSU_REPO" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "KERNELSU_TAG=$(cat $CONFIG_ENV | grep -w "KERNELSU_TAG" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "ADD_KPROBES_CONFIG=$(cat $CONFIG_ENV | grep -w "ADD_KPROBES_CONFIG" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "DISABLE-LTO=$(cat $CONFIG_ENV | grep -w "DISABLE-LTO" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
@@ -57,6 +56,7 @@ jobs:
         echo "KSU_EXPECTED_SIZE=$(cat $CONFIG_ENV | grep -w "KSU_EXPECTED_SIZE" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "KSU_EXPECTED_HASH=$(cat $CONFIG_ENV | grep -w "KSU_EXPECTED_HASH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
         echo "REMOVE_UNUSED_PACKAGES=$(cat $CONFIG_ENV | grep -w "REMOVE_UNUSED_PACKAGES" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        echo "KSU_MANAGER_PACKAGE=$(cat $CONFIG_ENV | grep -w "KSU_MANAGER_PACKAGE" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
 
     - name: Remove unused packages
       if: env.REMOVE_UNUSED_PACKAGES == 'true'
@@ -109,7 +109,7 @@ jobs:
         fi
 
     - name: Download Gcc-aosp
-      if: env.USE_CUSTOM_GCC_64 != 'true' || env.USE_CUSTOM_GCC_32 != 'true'
+      if: env.USE_CUSTOM_GCC_64 != 'true' && env.USE_CUSTOM_GCC_32 != 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         if [ ${{ env.ENABLE_GCC_ARM64 }} = true ]; then
@@ -180,6 +180,7 @@ jobs:
         else
           echo "LOCALVERSION=" >> $GITHUB_ENV
         fi
+        sed -i 's/-Wno-format-security/-Wno-format-security -w/' android-kernel/Makefile
 
     - name: Download source boot image
       if: env.BUILD_BOOT_IMG == 'true'
@@ -199,6 +200,7 @@ jobs:
         curl -LSs "https://raw.githubusercontent.com/longhuan1999/KernelSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
         KSU_VERSION=$(cd KernelSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
         echo "UPLOADNAME=-KernelSU_$KSU_VERSION" >> $GITHUB_ENV
+        echo "CONFIG_KSU_DEBUG=y" >> arch/arm64/configs/${{ env.KERNEL_CONFIG }}
 
     - name: Setup Configuration for Kernel
       run: |
@@ -247,6 +249,9 @@ jobs:
         if [ ! -z ${{ env.KSU_EXPECTED_SIZE }} ] && [ ! -z ${{ env.KSU_EXPECTED_HASH }} ]; then
           export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
           export KSU_EXPECTED_HASH=${{ env.KSU_EXPECTED_HASH }}
+        fi
+        if [ ! -z ${{ env.KSU_MANAGER_PACKAGE}} ]; then
+          export KSU_MANAGER_PACKAGE=${{ env.KSU_MANAGER_PACKAGE}}
         fi
         make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
         if [ ${{ env.ENABLE_CCACHE }} = true ]; then
