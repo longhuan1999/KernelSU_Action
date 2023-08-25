@@ -180,6 +180,7 @@ jobs:
         else
           echo "LOCALVERSION=" >> $GITHUB_ENV
         fi
+        sed -i 's/-Wno-format-security \\/-Wno-format-security -w \\/' android-kernel/Makefile
 
     - name: Download source boot image
       if: env.BUILD_BOOT_IMG == 'true'
