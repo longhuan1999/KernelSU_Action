@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Build Kernel by ${{ github.actor }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -79,7 +79,7 @@ jobs:
         echo "BUILD_TIME=$(TZ=Asia/Shanghai date "+%Y%m%d%H%M")" >> $GITHUB_ENV
         echo "DEVICE=$(echo ${{ env.KERNEL_CONFIG }} | sed 's!vendor/!!;s/_defconfig//;s/_user//;s/-perf//')" >> $GITHUB_ENV
         sudo apt-get update
-        sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
+        sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev libncurses5-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
     - name: Download Clang-aosp
@@ -87,8 +87,8 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         mkdir clang-aosp
-        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${{ env.CLANG_BRANCH }}/clang-${{ env.CLANG_VERSION }}.tar.gz
-        tar -C clang-aosp/ -zxvf clang-${{ env.CLANG_VERSION }}.tar.gz
+        wget -nv https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${{ env.CLANG_BRANCH }}/clang-${{ env.CLANG_VERSION }}.tar.gz
+        tar -C clang-aosp/ -zxf clang-${{ env.CLANG_VERSION }}.tar.gz
 
     - name: Download Custom-Clang
       if: env.USE_CUSTOM_CLANG == 'true'
@@ -96,14 +96,14 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel_workspace
         if [[ ${{ env.CUSTOM_CLANG_SOURCE }} =~ git ]]; then
             if [[ ${{ env.CUSTOM_CLANG_SOURCE }} == *'.tar.gz' ]]; then
-                wget -O clang.tar.gz ${{ env.CUSTOM_CLANG_SOURCE }}
+                wget -nv -O clang.tar.gz ${{ env.CUSTOM_CLANG_SOURCE }}
                 mkdir clang-aosp
-                tar -C clang-aosp/ -zxvf clang.tar.gz
+                tar -C clang-aosp/ -zxf clang.tar.gz
             else
                 git clone ${{ env.CUSTOM_CLANG_SOURCE }} -b ${{ env.CUSTOM_CLANG_BRANCH }} clang-aosp --depth=1
             fi        
         else
-            wget -O clang.zip ${{ env.CUSTOM_CLANG_SOURCE }}
+            wget -nv -O clang.zip ${{ env.CUSTOM_CLANG_SOURCE }}
             mkdir clang-aosp
             unzip clang.zip -d clang-aosp/
         fi
@@ -114,15 +114,15 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel_workspace
         if [ ${{ env.ENABLE_GCC_ARM64 }} = true ]; then
             mkdir gcc-64
-            wget -O gcc-aarch64.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-            tar -C gcc-64/ -zxvf gcc-aarch64.tar.gz
+            wget -nv -O gcc-aarch64.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
+            tar -C gcc-64/ -zxf gcc-aarch64.tar.gz
             echo "GCC_64=CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-64/bin/aarch64-linux-android-" >> $GITHUB_ENV
         fi
 
         if [ ${{ env.ENABLE_GCC_ARM32 }} = true ]; then
             mkdir gcc-32
-            wget -O gcc-arm.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-            tar -C gcc-32/ -zxvf gcc-arm.tar.gz
+            wget -nv -O gcc-arm.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
+            tar -C gcc-32/ -zxf gcc-arm.tar.gz
             echo "GCC_32=CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/kernel_workspace/gcc-32/bin/arm-linux-androideabi-" >> $GITHUB_ENV
         fi
 
@@ -131,16 +131,17 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         if [ ${{ env.USE_CUSTOM_GCC_64 }} = true ]; then
-          if [[ ${{ env.CUSTOM_GCC_64_SOURCE }} =~ git ]]; then
+          if [[ ${{ env.CUSTOM_GCC_64_SOURCE }} =~ googlesource ]]; then
               if [[ ${{ env.CUSTOM_GCC_64_SOURCE }} == *'.tar.gz' ]]; then
-                wget -O gcc-64.tar.gz ${{ env.CUSTOM_CLANG_SOURCE }}
+                wget -nv -O gcc-64.tar.gz ${{ env.CUSTOM_GCC_64_SOURCE }}
                 mkdir gcc-64
-                tar -C gcc-64/ -zxvf gcc-64.tar.gz
+                tar -C gcc-64/ -zxf gcc-64.tar.gz
+                echo "[+] Custom-Gcc 已安装"
               else
                 git clone ${{ env.CUSTOM_GCC_64_SOURCE }} -b ${{ env.CUSTOM_GCC_64_BRANCH }} gcc-64 --depth=1
               fi
           else
-              wget -O gcc-64.zip ${{ env.CUSTOM_GCC_64_SOURCE }}
+              wget -nv -O gcc-64.zip ${{ env.CUSTOM_GCC_64_SOURCE }}
               mkdir gcc-64
               unzip gcc-64.zip -d gcc-64/
           fi
@@ -148,16 +149,16 @@ jobs:
         fi
 
         if [ ${{ env.USE_CUSTOM_GCC_32 }} = true ]; then
-          if [[ ${{ env.CUSTOM_GCC_32_SOURCE }} =~ git ]]; then
+          if [[ ${{ env.CUSTOM_GCC_32_SOURCE }} =~ googlesource ]]; then
               if [[ ${{ env.CUSTOM_GCC_32_SOURCE }} == *'.tar.gz' ]]; then
-                wget -O gcc-32.tar.gz ${{ env.CUSTOM_CLANG_SOURCE }}
+                wget -nv -O gcc-32.tar.gz ${{ env.CUSTOM_GCC_32_SOURCE }}
                 mkdir gcc-32
-                tar -C gcc-32/ -zxvf gcc-32.tar.gz
+                tar -C gcc-32/ -zxf gcc-32.tar.gz
               else
                 git clone ${{ env.CUSTOM_GCC_32_SOURCE }} -b ${{ env.CUSTOM_GCC_32_BRANCH }} gcc-32 --depth=1
               fi
           else
-            wget -O gcc-32.zip ${{ env.CUSTOM_GCC_32_SOURCE }}
+            wget -nv -O gcc-32.zip ${{ env.CUSTOM_GCC_32_SOURCE }}
             mkdir gcc-32
             unzip gcc-32.zip -d gcc-32/
           fi
@@ -184,7 +185,7 @@ jobs:
       if: env.BUILD_BOOT_IMG == 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
-        wget -O boot-source.img ${{ env.SOURCE_BOOT_IMAGE }}
+        wget -nv -O boot-source.img ${{ env.SOURCE_BOOT_IMAGE }}
         if [ -f boot-source.img ]; then
             echo "FORMAT_MKBOOTING=$(echo `tools/unpack_bootimg.py --boot_img=boot-source.img --format mkbootimg`)" >> $GITHUB_ENV
             echo "HAVE_SOURCE_BOOT_IMAGE=true" >> $GITHUB_ENV
@@ -195,7 +196,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
         rm -rf KernelSU drivers/kernelsu
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
+        curl -LSs "https://raw.githubusercontent.com/longhuan1999/KernelSU/main/kernel/setup.sh" | bash -s ${{ env.KERNELSU_TAG }}
         KSU_VERSION=$(cd KernelSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
         echo "UPLOADNAME=-KernelSU_$KSU_VERSION" >> $GITHUB_ENV
 
@@ -247,11 +248,11 @@ jobs:
           export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
           export KSU_EXPECTED_HASH=${{ env.KSU_EXPECTED_HASH }}
         fi
-        make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
+        make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
         if [ ${{ env.ENABLE_CCACHE }} = true ]; then
-            make -j$(nproc --all) CC="ccache clang" O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
+            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
         else
-            make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
+            make -j$(nproc --all) O=out ARCH=${{ env.ARCH }}  ${{ env.GCC_64 }} ${{ env.GCC_32 }}
         fi
 
     - name: Check a kernel output files
